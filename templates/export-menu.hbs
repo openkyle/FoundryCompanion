@@ -5,11 +5,33 @@
   <p class="notes">
     Choose what Foundry data is exported and how images are referenced.
   </p>
+  <fieldset class="foundry-companion-options is-disabled">
+    <legend>Interval Refresh</legend>
+    <label for="foundry-companion-refresh-minutes">Live refresh minutes</label>
+    <input id="foundry-companion-refresh-minutes" type="number" value="{{refreshMinutes}}" min="1" max="30" step="1" disabled>
+    <p class="option-note">Interval refresh is currently disabled. The preview updates when the GM changes FoundryCompanion settings, relevant Foundry data changes, or the preview is manually refreshed.</p>
+  </fieldset>
+  <fieldset class="foundry-companion-options">
+    <legend>Game Session Story</legend>
+    <label for="foundry-companion-story-journal">Story Journal</label>
+    <select id="foundry-companion-story-journal" data-story-journal>
+      {{#each storyJournalOptions}}
+        <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+      {{/each}}
+    </select>
+    {{#each storyLabelOptions}}
+      <label>
+        <input type="radio" name="story-label-mode" value="{{value}}" data-story-label-mode {{#if selected}}checked{{/if}}>
+        {{label}}
+      </label>
+    {{/each}}
+    <p class="option-note">Each page in the selected Journal Entry publishes as an individual rich-text story entry for the companion website.</p>
+  </fieldset>
   <button type="button" data-action="test-connection">
     <i class="fas fa-plug"></i>
     Test Connection
   </button>
-  <p class="notes">Uses the configured Companion API base URL and token to call <code>/&lt;token&gt;/ping</code>.</p>
+  <p class="notes">Uses the configured Companion connection key to call <code>/&lt;token&gt;/ping</code>.</p>
   <fieldset class="foundry-companion-options">
     <legend>Sidebar Data Scope</legend>
     <label>
@@ -29,7 +51,7 @@
       <input type="radio" name="image-mode" value="linked" data-image-mode {{#unless exportOptions.embedImageData}}checked{{/unless}}>
       Use image links
     </label>
-    <p class="option-note">Smaller and cheaper payloads, but Replit must be able to load images from Foundry URLs.</p>
+    <p class="option-note">Smaller payloads, but the companion website must be able to load images from Foundry URLs.</p>
     <label>
       <input type="radio" name="image-mode" value="embedded" data-image-mode {{#if exportOptions.embedImageData}}checked{{/if}}>
       Use image embedding

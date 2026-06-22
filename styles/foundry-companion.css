@@ -34,10 +34,23 @@
   gap: 8px;
 }
 
+.foundry-companion-options select {
+  width: 100%;
+}
+
 .foundry-companion-options .option-note {
   margin: -2px 0 6px 28px;
   color: var(--color-text-light-6);
   font-size: 0.9rem;
+}
+
+.foundry-companion-options.is-disabled {
+  opacity: 0.62;
+}
+
+.foundry-companion-options.is-disabled input,
+.foundry-companion-options.is-disabled select {
+  cursor: not-allowed;
 }
 
 .foundry-companion-window .window-content {
@@ -219,7 +232,8 @@
 }
 
 .foundry-companion-page .record-row,
-.foundry-companion-page .record-card {
+.foundry-companion-page .record-card,
+.foundry-companion-page .story-chapter {
   background: #ffffff;
   border: 1px solid #ded6cc;
   border-radius: 8px;
@@ -230,6 +244,73 @@
   cursor: pointer;
   color: #191716;
   font-weight: 700;
+}
+
+.foundry-companion-page .story-chapter-list {
+  display: grid;
+  gap: 18px;
+}
+
+.foundry-companion-page .story-toolbar {
+  position: sticky;
+  top: 50px;
+  z-index: 1;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 12px;
+  padding: 8px 0;
+  background: #fffaf2;
+  border-bottom: 1px solid #ded6cc;
+}
+
+.foundry-companion-page .story-chapter header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.foundry-companion-page .story-chapter header p {
+  margin: 0;
+  color: #28666e;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.foundry-companion-page .story-chapter h3 {
+  margin: 0;
+  color: #191716;
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.foundry-companion-page .story-toolbar button,
+.foundry-companion-page .story-chapter button {
+  flex: 0 0 auto;
+}
+
+.foundry-companion-page .story-chapter-image {
+  display: block;
+  max-width: min(100%, 720px);
+  max-height: 360px;
+  margin: 12px 0 0;
+  border: 1px solid #ded6cc;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.foundry-companion-page .story-chapter-content {
+  margin-top: 12px;
+  color: #191716;
+  line-height: 1.55;
+}
+
+.foundry-companion-page .story-chapter-content img {
+  max-width: 100%;
+  height: auto;
 }
 
 .foundry-companion-page .record-row summary span {

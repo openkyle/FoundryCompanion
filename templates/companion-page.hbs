@@ -6,7 +6,7 @@
       <p class="meta">{{count}} publishable records. Updated {{updatedAt}}.</p>
       {{#if summary}}
         <p class="meta">
-          Quests {{summary.quests}} · Journal {{summary.journalEntries}} · Contacts {{summary.contacts}} · Items {{summary.items}} · Characters {{summary.characterSheets}}
+          Quests {{summary.quests}} · Story {{summary.storyChapters}} · Journal {{summary.journalEntries}} · Contacts {{summary.contacts}} · Items {{summary.items}} · Characters {{summary.characterSheets}}
         </p>
       {{/if}}
       <p class="meta">Mode: {{publishMode}} · Images: {{imageMode}}</p>
@@ -71,6 +71,36 @@
         {{/if}}
       </section>
     {{/if}}
+
+    <section id="fc-gameSessionStory" class="preview-section">
+      <h2>Game Session Story</h2>
+      {{#if gameSessionStory.chapters.length}}
+        <div class="story-toolbar">
+          <button type="button" data-story-return>
+            <i class="fas fa-bookmark"></i>
+            Return to bookmark
+          </button>
+        </div>
+        <div class="story-chapter-list">
+          {{#each gameSessionStory.chapters}}
+            <article class="story-chapter" data-story-chapter-id="{{id}}">
+              <header>
+                <p>{{label}}</p>
+                <button type="button" data-story-bookmark="{{id}}">
+                  <i class="fas fa-bookmark"></i>
+                  Bookmark
+                </button>
+              </header>
+              <h3>{{title}}</h3>
+              {{#if srcUrl}}<img class="story-chapter-image" src="{{srcUrl}}" alt="">{{/if}}
+              {{#if text}}<div class="story-chapter-content">{{{text}}}</div>{{/if}}
+            </article>
+          {{/each}}
+        </div>
+      {{else}}
+        <p class="empty-inline">{{gameSessionStory.setupMessage}}</p>
+      {{/if}}
+    </section>
 
     {{#if exportOptions.journal}}
       <section id="fc-journal" class="preview-section">
