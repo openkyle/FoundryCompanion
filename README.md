@@ -17,6 +17,7 @@ FoundryCompanion is built for Foundry first. Forien's Quest Log is an optional i
 - Includes a GM setting to publish either player-visible sidebar content only, or all standard Foundry sidebar data.
 - Includes **Configure Export Options** checkboxes for Enable Forien Quest Log Exporting, Journal, Contacts, Items, and Character Sheets.
 - Includes optional **5e - Custom Abilities & Skills** (`dnd5e-custom-skills`) support for custom ability and skill labels.
+- Includes optional **TradeHub Markets** (`tradehub-markets`) read-only export for TradeHub Capital, current location, and owned party ships with modules, HP, AC, cargo, and lightweight ship metadata.
 - Lets the GM choose one Journal Entry as the **Game Session Story** source; each page exports directly as an individual rich-text chapter/session with image references.
 - Game Session Story supports a Chapter/Session label setting, continuous downward reading, and bookmark/return metadata for the companion website.
 - Image export mode can use image links for smaller payloads or image embedding for larger, portable payloads.
@@ -24,7 +25,7 @@ FoundryCompanion is built for Foundry first. Forien's Quest Log is an optional i
 - Contacts and character sheets are grouped by Foundry folder path.
 - Items are grouped by holder, including owned character inventories and world items.
 - Quest preview shows objectives.
-- Export schema v7 keeps only human-readable summaries, descriptions, images, folders, objectives, rewards, story chapters, and readable sheet fields.
+- Export schema v8 keeps only human-readable summaries, descriptions, images, folders, objectives, rewards, story chapters, TradeHub ship summaries, and readable sheet fields.
 - Exported JSON omits empty/default values, raw Foundry/Forien task objects, ownership bookkeeping, active effects, duplicate image paths, and duplicate grouped record bodies.
 - Character sheet summaries export all abilities and skills found in actor data, including custom keys such as `tec`, `cua_0`, or `cus_4`. Use `summary.abilities` / `summary.skills` for compact maps and `summary.abilityDetails` / `summary.skillDetails` for labels/modifiers.
 - When `dnd5e-custom-skills` is active and **Enable Custom Abilities & Skills Exporting** is checked, FoundryCompanion reads `customAbilitiesList`, `customSkillList`, `hiddenAbilities`, and `hiddenSkills` from that module's world setting.
@@ -69,7 +70,11 @@ Use **Image Export Mode** to choose exactly one mode:
 
 Use **Configure Export Options** in the FoundryCompanion panel to choose which sections are included in the companion website payload. Unchecked sections are omitted from navigation and exported as empty section payloads.
 
-In exported/published schema v7 payloads, folder/status groups use ID references instead of duplicating full records. Read full records from `journal.entries`, `contacts.actors`, `items.items`, `characterSheets.actors`, `questLog.quests`, and `gameSessionStory.chapters`; use group `recordIds` or `questIds` to reconstruct display sections.
+TradeHub Markets export is read-only. FoundryCompanion publishes TradeHub Capital, current location, and owned party ships with modules/HP/cargo metadata. It does not publish live markets, buy/sell goods, shipyard inventory, predictive rumours, transaction history, or repair/action controls.
+
+In exported/published schema v8 payloads, folder/status groups use ID references instead of duplicating full records. Read full records from `journal.entries`, `contacts.actors`, `items.items`, `characterSheets.actors`, `questLog.quests`, `gameSessionStory.chapters`, and `tradeHub.ships`; use group `recordIds` or `questIds` to reconstruct display sections.
+
+Journal entries, Journal pages, folders, and Game Session Story chapters include Foundry `sort`/`order` metadata when available. The companion website should preserve received array order or sort by `order`; do not alphabetize Journal pages if Foundry order matters.
 
 ## Companion website publishing
 
@@ -124,8 +129,10 @@ Published sync body:
   "quests": [],
   "story": {},
   "gameSessionStory": {},
+  "tradeHub": {},
+  "ships": [],
   "meta": {
-    "schemaVersion": 7,
+    "schemaVersion": 8,
     "summary": {},
     "navigation": [],
     "integrations": {}
@@ -139,7 +146,7 @@ The **Export JSON snapshot** button still downloads the full local payload with:
 
 ```json
 {
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "module": "foundry-companion",
   "world": {
     "id": "your-world-id",
@@ -152,6 +159,9 @@ The **Export JSON snapshot** button still downloads the full local payload with:
   "exportOptions": {
     "questLog": true,
     "customAbilitiesSkills": true,
+    "tradeHub": true,
+    "tradeHubCapital": true,
+    "tradeHubShips": true,
     "journal": true,
     "contacts": true,
     "items": true,
@@ -164,7 +174,7 @@ The **Export JSON snapshot** button still downloads the full local payload with:
     { "id": "journal", "label": "Journal" },
     { "id": "contacts", "label": "Contacts" },
     { "id": "items", "label": "Items" },
-    { "id": "characterSheets", "label": "Character Sheet" }
+    { "id": "characterSheets", "label": "Characters & Ships" }
   ],
   "summary": {
     "quests": 0,
@@ -173,7 +183,8 @@ The **Export JSON snapshot** button still downloads the full local payload with:
     "contacts": 20,
     "items": 8,
     "characterSheets": 4,
-    "totalDocuments": 52
+    "tradeHubShips": 1,
+    "totalDocuments": 53
   },
   "questLog": {
     "enabled": false,
@@ -209,6 +220,49 @@ The **Export JSON snapshot** button still downloads the full local payload with:
         "type": "text",
         "text": "<p>Rich text from the Journal page.</p>",
         "imageUrls": []
+      }
+    ]
+  },
+  "tradeHub": {
+    "enabled": true,
+    "active": true,
+    "vehicleLabel": "Vessel",
+    "capital": 125000,
+    "capitalDisplay": "125,000 GP",
+    "currentLocation": "Nemoï",
+    "ships": [
+      {
+        "id": "ship-id",
+        "name": "USS Light Hungry",
+        "type": "vehicle",
+        "imageUrl": "https://...",
+        "hp": { "value": 42, "max": 60 },
+        "ac": 15,
+        "cargo": {
+          "current": 1200,
+          "max": 4000,
+          "remaining": 2800,
+          "capacityTons": 2
+        },
+        "meta": {
+          "shipValue": 75000,
+          "moduleValue": 25000,
+          "totalValue": 100000,
+          "shieldHp": { "value": 8, "max": 12 },
+          "hyperdrive": "3 parsecs"
+        },
+        "modules": [
+          {
+            "id": "module-id",
+            "name": "Shield Generator",
+            "type": "equipment",
+            "imageUrl": "https://...",
+            "hp": { "value": 8, "max": 12 },
+            "quantity": 1,
+            "weight": 0,
+            "value": 5000
+          }
+        ]
       }
     ]
   },

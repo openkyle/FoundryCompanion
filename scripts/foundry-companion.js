@@ -16,9 +16,13 @@ const QUEST_STATUS_LABELS = {
 
 const WEBSITE_STATUS_ORDER = ["Available", "In Progress", "Completed", "Failed"];
 const CUSTOM_ABILITIES_SKILLS_MODULE_ID = "dnd5e-custom-skills";
+const TRADEHUB_MARKETS_MODULE_ID = "tradehub-markets";
 const EXPORT_OPTION_SETTINGS = {
   questLog: "exportQuestLog",
   customAbilitiesSkills: "exportCustomAbilitiesSkills",
+  tradeHub: "exportTradeHub",
+  tradeHubCapital: "exportTradeHubCapital",
+  tradeHubShips: "exportTradeHubShips",
   journal: "exportJournal",
   contacts: "exportContacts",
   items: "exportItems",
@@ -164,6 +168,36 @@ Hooks.once("init", () => {
   game.settings.register(MODULE_ID, EXPORT_OPTION_SETTINGS.customAbilitiesSkills, {
     name: "Enable Custom Abilities & Skills Exporting",
     hint: "Use labels and actor data from the optional 5e Custom Abilities & Skills module when it is active.",
+    scope: "world",
+    config: false,
+    restricted: true,
+    type: Boolean,
+    default: true
+  });
+
+  game.settings.register(MODULE_ID, EXPORT_OPTION_SETTINGS.tradeHub, {
+    name: "Enable TradeHub Markets Exporting",
+    hint: "Publish read-only TradeHub summary data when TradeHub Markets is active.",
+    scope: "world",
+    config: false,
+    restricted: true,
+    type: Boolean,
+    default: true
+  });
+
+  game.settings.register(MODULE_ID, EXPORT_OPTION_SETTINGS.tradeHubCapital, {
+    name: "TradeHub Capital",
+    hint: "Publish the current TradeHub Capital balance and current party location.",
+    scope: "world",
+    config: false,
+    restricted: true,
+    type: Boolean,
+    default: true
+  });
+
+  game.settings.register(MODULE_ID, EXPORT_OPTION_SETTINGS.tradeHubShips, {
+    name: "TradeHub Party Ships",
+    hint: "Publish owned party vehicle actors as read-only ship cards with modules, HP, AC, cargo, and lightweight ship metadata.",
     scope: "world",
     config: false,
     restricted: true,
@@ -375,6 +409,7 @@ class FoundryCompanionApp extends Application {
       items: payload.items,
       characterSheets: payload.characterSheets,
       gameSessionStory: payload.gameSessionStory,
+      tradeHub: payload.tradeHub,
       publishMode: payload.publishMode,
       exportOptions: payload.exportOptions,
       summary: payload.summary
@@ -754,11 +789,11 @@ class FoundryCompanion {
       .filter((entry) => !this.hasForienQuestLog() || !this.getForienFlagData(entry))
       .filter((entry) => this.isJournalVisibleToPlayers(entry))
       .map((entry) => this.serializeJournalEntry(entry))
-      .sort(this.sortByFolderThenName);
+      .sort(this.sortByFolderThenSortOrder);
 
     return {
       folders: this.buildFolderTree("JournalEntry", entries),
-      groups: this.groupByFolder(entries),
+      groups: this.groupByFolder(entries, this.sortBySortOrder),
       entries
     };
   }
@@ -819,6 +854,7 @@ class FoundryCompanion {
     });
 
     const chapters = (entry.pages?.contents ?? [])
+      .sort(this.sortBySortOrder)
       .map((page, index) => this.serializeStoryChapter(page, index, labelSingular))
       .filter((chapter) => chapter.title || chapter.text || chapter.srcUrl);
 
@@ -882,6 +918,7 @@ class FoundryCompanion {
       id: page.id,
       uuid: page.uuid,
       order,
+      sort: page.sort,
       label: `${labelSingular} ${order}`,
       title: page.name,
       type: page.type,
@@ -961,6 +998,182 @@ class FoundryCompanion {
     };
   }
 
+  static collectTradeHub() {
+    const enabled = game.settings.get(MODULE_ID, EXPORT_OPTION_SETTINGS.tradeHub);
+    const active = this.hasTradeHubMarkets();
+    const data = active ? this.tradeHubData() : {};
+    const includeCapital = enabled && game.settings.get(MODULE_ID, EXPORT_OPTION_SETTINGS.tradeHubCapital);
+    const includeShips = enabled && game.settings.get(MODULE_ID, EXPORT_OPTION_SETTINGS.tradeHubShips);
+    const ships = includeShips ? this.collectTradeHubShips(data) : [];
+    const capital = includeCapital ? Number(data.capital || 0) : undefined;
+    const currentLocation = includeCapital ? String(data.currentLocation || "") : "";
+
+    return this.compactObject({
+      enabled,
+      active,
+      module: this.tradeHubModuleInfo(),
+      vehicleLabel: this.tradeHubSetting("vehicleLabel", "Vessel"),
+      capital,
+      capitalDisplay: includeCapital ? this.formatGp(capital) : "",
+      currentLocation,
+      ships,
+      summary: {
+        ships: ships.length,
+        modules: ships.reduce((total, ship) => total + (ship.modules?.length ?? 0), 0),
+        capital
+      }
+    });
+  }
+
+  static collectTradeHubShips(data = {}) {
+    const directoryShips = Array.isArray(data.shipDirectory) ? data.shipDirectory : [];
+    const sourceShips = directoryShips.length ?
+      directoryShips.filter((ship) => this.isOwnedSnapshotByAnyPlayer(ship)) :
+      game.actors.contents
+        .filter((actor) => actor.type === "vehicle")
+        .filter((actor) => actor.name !== this.tradeHubSetting("bankActorName", "Bank of Holding"))
+        .filter((actor) => this.isOwnedByAnyPlayer(actor));
+
+    return sourceShips
+      .map((ship) => this.serializeTradeHubShip(ship))
+      .filter((ship) => ship.name)
+      .sort((a, b) => (a.folder?.path ?? "").localeCompare(b.folder?.path ?? "") || a.name.localeCompare(b.name));
+  }
+
+  static serializeTradeHubShip(ship) {
+    const actor = game.actors.get(ship.id);
+    const source = actor ?? ship;
+    const system = source.system ?? {};
+    const modules = this.tradeHubShipItems(source)
+      .filter((item) => ["equipment", "weapon"].includes(item.type))
+      .map((item) => this.serializeTradeHubModule(item))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const cargo = this.tradeHubCargoStats(source, system);
+    const hp = this.tradeHubHp(system.attributes?.hp);
+    const shieldHp = modules
+      .filter((module) => /shield/i.test(module.name))
+      .reduce((total, module) => total + Number(module.hp?.value ?? 0), 0);
+    const shieldMax = modules
+      .filter((module) => /shield/i.test(module.name))
+      .reduce((total, module) => total + Number(module.hp?.max ?? 0), 0);
+    const moduleValue = modules.reduce((total, module) => total + Number(module.value ?? 0), 0);
+    const shipValue = this.parseNumber(system.traits?.dimensions);
+
+    return this.compactObject({
+      id: source.id,
+      name: source.name,
+      type: "vehicle",
+      imageUrl: this.resolveAssetUrl(source.img ?? ""),
+      folder: this.tradeHubShipFolder(source),
+      hp,
+      ac: this.firstValue(system.attributes?.ac?.value, system.attributes?.ac?.flat, system.attributes?.ac),
+      cargo,
+      meta: this.compactObject({
+        size: system.traits?.size,
+        vehicleType: system.traits?.vehicleType,
+        shipValue,
+        moduleValue,
+        totalValue: shipValue + moduleValue,
+        shieldHp: this.compactObject({ value: shieldHp, max: shieldMax }),
+        hyperdrive: this.tradeHubHyperdriveText(source),
+        biography: this.cleanHtml(system.details?.biography?.public ?? "")
+      }),
+      modules
+    });
+  }
+
+  static serializeTradeHubModule(item) {
+    const system = item.system ?? {};
+    return this.compactObject({
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      imageUrl: this.resolveAssetUrl(item.img ?? ""),
+      hp: this.tradeHubHp(system.hp),
+      ac: this.firstValue(system.armor?.value, system.ac?.value, system.ac),
+      quantity: Number(system.quantity ?? item.quantity ?? 0),
+      weight: Number(system.weight ?? item.weight ?? 0),
+      value: this.parseNumber(system.price?.value ?? system.price),
+      price: this.compactObject(system.price),
+      equipped: system.equipped,
+      description: this.cleanHtml(system.description?.value ?? system.description ?? "")
+    });
+  }
+
+  static tradeHubShipItems(ship) {
+    if (!ship) return [];
+    if (Array.isArray(ship.items)) return ship.items;
+    return ship.items?.contents ?? [];
+  }
+
+  static tradeHubHp(hp = {}) {
+    return this.compactObject({
+      value: Number(this.firstValue(hp.value, hp.current, 0)),
+      max: Number(this.firstValue(hp.max, hp.maxHp, 0))
+    });
+  }
+
+  static tradeHubCargoStats(ship, system = {}) {
+    const stats = ship.cargoStats ?? {};
+    const baseMax = Number(system.attributes?.capacity?.cargo || 0) * 2000;
+    const max = Number(this.firstValue(stats.max, baseMax, 0));
+    const current = Number(this.firstValue(stats.current, 0));
+    const remaining = Number(this.firstValue(stats.remaining, max ? max - current : 0));
+    return this.compactObject({
+      current,
+      max,
+      remaining,
+      pct: Number(this.firstValue(stats.pct, max ? Math.min((current / max) * 100, 100) : 0)),
+      capacityTons: Number(this.firstValue(system.cargo?.capacity, system.attributes?.capacity?.cargo, 0))
+    });
+  }
+
+  static tradeHubShipFolder(ship) {
+    if (ship.folder) return this.serializeFolderRef(ship.folder);
+    if (ship.folderName) return this.compactObject({ name: ship.folderName, path: ship.folderName });
+    return null;
+  }
+
+  static tradeHubHyperdriveText(ship) {
+    const hyperdrive = this.tradeHubShipItems(ship).find((item) => /hyper\s*drive|hyperdrive/i.test(item.name));
+    return this.firstValue(
+      hyperdrive?.system?.customLabel,
+      hyperdrive?.system?.details?.customLabel,
+      hyperdrive?.system?.description?.value,
+      ""
+    );
+  }
+
+  static hasTradeHubMarkets() {
+    return Boolean(game.modules.get(TRADEHUB_MARKETS_MODULE_ID)?.active);
+  }
+
+  static tradeHubModuleInfo() {
+    const module = game.modules.get(TRADEHUB_MARKETS_MODULE_ID);
+    if (!module) return null;
+    return this.compactObject({
+      id: module.id,
+      title: module.title,
+      version: module.version
+    });
+  }
+
+  static tradeHubData() {
+    try {
+      return game.settings.get(TRADEHUB_MARKETS_MODULE_ID, "data") ?? {};
+    } catch {
+      return {};
+    }
+  }
+
+  static tradeHubSetting(key, fallback = "") {
+    try {
+      return game.settings.get(TRADEHUB_MARKETS_MODULE_ID, key) ?? fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
   static serializeJournalEntry(entry) {
     const base = this.serializeDocumentBase(entry);
     delete base.type;
@@ -970,6 +1183,7 @@ class FoundryCompanion {
       content: this.cleanHtml(entry.content ?? ""),
       pages: pages
         .filter((page) => this.shouldPublishJournalPage(page))
+        .sort(this.sortBySortOrder)
         .map((page) => this.serializeJournalPage(page))
     });
   }
@@ -982,6 +1196,8 @@ class FoundryCompanion {
       id: page.id,
       name: page.name,
       type: page.type,
+      sort: page.sort,
+      order: page.sort,
       title: {
         show: page.title?.show,
         level: page.title?.level
@@ -1271,6 +1487,8 @@ class FoundryCompanion {
       id: document.id,
       name: document.name,
       type: document.type ?? document.documentName,
+      sort: document.sort,
+      order: document.sort,
       folder: this.serializeFolderRef(document.folder)
     });
   }
@@ -1280,7 +1498,9 @@ class FoundryCompanion {
     return this.compactObject({
       id: folder.id,
       name: folder.name,
-      path: this.folderPath(folder)
+      path: this.folderPath(folder),
+      sort: folder.sort,
+      order: folder.sort
     });
   }
 
@@ -1293,13 +1513,15 @@ class FoundryCompanion {
         id: folder.id,
         name: folder.name,
         parent: folder.folder?.id ?? folder.parent ?? null,
-        path: this.folderPath(folder)
+        path: this.folderPath(folder),
+        sort: folder.sort,
+        order: folder.sort
       }));
 
-    return folders.sort((a, b) => a.path.localeCompare(b.path));
+    return folders.sort((a, b) => this.sortByFolderPathThenSortOrder(a, b));
   }
 
-  static groupByFolder(documents) {
+  static groupByFolder(documents, recordSort = (a, b) => a.name.localeCompare(b.name)) {
     const groups = new Map();
     for (const document of documents) {
       const key = document.folder?.path || "Unfiled";
@@ -1308,6 +1530,8 @@ class FoundryCompanion {
           id: document.folder?.id ?? null,
           name: key,
           path: key,
+          sort: document.folder?.sort,
+          order: document.folder?.sort,
           records: []
         });
       }
@@ -1317,9 +1541,9 @@ class FoundryCompanion {
     return Array.from(groups.values())
       .map((group) => ({
         ...group,
-        records: group.records.sort((a, b) => a.name.localeCompare(b.name))
+        records: group.records.sort(recordSort)
       }))
-      .sort((a, b) => a.path.localeCompare(b.path));
+      .sort((a, b) => this.sortByFolderPathThenSortOrder(a, b));
   }
 
   static groupItemsByHolder(items) {
@@ -1354,6 +1578,23 @@ class FoundryCompanion {
   static sortByFolderThenName(a, b) {
     return (a.folder?.path ?? "Unfiled").localeCompare(b.folder?.path ?? "Unfiled") ||
       a.name.localeCompare(b.name);
+  }
+
+  static sortByFolderThenSortOrder(a, b) {
+    return (a.folder?.path ?? "Unfiled").localeCompare(b.folder?.path ?? "Unfiled") ||
+      FoundryCompanion.sortBySortOrder(a, b);
+  }
+
+  static sortByFolderPathThenSortOrder(a, b) {
+    return (a.path ?? "Unfiled").localeCompare(b.path ?? "Unfiled") ||
+      FoundryCompanion.sortBySortOrder(a, b);
+  }
+
+  static sortBySortOrder(a, b) {
+    const aSort = Number(a.sort ?? a.order ?? 0);
+    const bSort = Number(b.sort ?? b.order ?? 0);
+    if (aSort !== bSort) return aSort - bSort;
+    return (a.name ?? a.title ?? "").localeCompare(b.name ?? b.title ?? "");
   }
 
   static folderHasVisibleDocument(folder, visibleFolderIds) {
@@ -1441,6 +1682,14 @@ class FoundryCompanion {
       .some((user) => this.permissionLevel(document, user) >= owner);
   }
 
+  static isOwnedSnapshotByAnyPlayer(snapshot) {
+    const owner = this.permissionConstant("OWNER");
+    const ownership = snapshot?.ownership ?? snapshot?.permission ?? {};
+    return game.users.contents
+      .filter((user) => !user.isGM)
+      .some((user) => Number(ownership[user.id] ?? ownership[user.role] ?? ownership.default ?? 0) >= owner);
+  }
+
   static permissionLevel(document, user) {
     if (typeof document.testUserPermission === "function") {
       const levels = CONST.DOCUMENT_OWNERSHIP_LEVELS ?? CONST.DOCUMENT_PERMISSION_LEVELS;
@@ -1501,6 +1750,16 @@ class FoundryCompanion {
   static textFromValue(value) {
     if (!value || typeof value !== "object") return String(value ?? "");
     return String(this.firstValue(value.name, value.title, value.label, value.text, ""));
+  }
+
+  static parseNumber(value) {
+    if (typeof value === "number") return value;
+    const match = String(value ?? "").match(/-?\d[\d,]*(\.\d+)?/);
+    return match ? Number(match[0].replace(/,/g, "")) : 0;
+  }
+
+  static formatGp(value) {
+    return `${Number(Math.floor(value || 0)).toLocaleString()} GP`;
   }
 
   static minimalObject(value) {
@@ -1592,6 +1851,7 @@ class FoundryCompanion {
     const items = exportOptions.items ? this.collectItems() : this.emptyFolderPayload("items");
     const characterSheets = exportOptions.characterSheets ? this.collectCharacterSheets() : this.emptyFolderPayload("actors");
     const gameSessionStory = this.collectGameSessionStory();
+    const tradeHub = exportOptions.tradeHub ? this.collectTradeHub() : this.compactObject({ enabled: false, active: this.hasTradeHubMarkets(), ships: [] });
     const hasForienQuestLog = this.hasForienQuestLog();
     const customAbilitiesSkills = this.customAbilitiesSkillsConfig();
     const questLog = {
@@ -1607,11 +1867,11 @@ class FoundryCompanion {
       ...(exportOptions.journal ? [{ id: "journal", label: "Journal", icon: "book-open" }] : []),
       ...(exportOptions.contacts ? [{ id: "contacts", label: "Contacts", icon: "users" }] : []),
       ...(exportOptions.items ? [{ id: "items", label: "Items", icon: "box" }] : []),
-      ...(exportOptions.characterSheets ? [{ id: "characterSheets", label: "Character Sheet", icon: "circle-user" }] : [])
+      ...(exportOptions.characterSheets || tradeHub.ships?.length ? [{ id: "characterSheets", label: "Characters & Ships", icon: "circle-user" }] : [])
     ];
 
     return {
-      schemaVersion: 7,
+      schemaVersion: 8,
       module: MODULE_ID,
       world: {
         id: game.world.id,
@@ -1631,6 +1891,11 @@ class FoundryCompanion {
           module: customAbilitiesSkills.module ?? null,
           abilities: customAbilitiesSkills.abilities,
           skills: customAbilitiesSkills.skills
+        },
+        tradeHub: {
+          enabled: exportOptions.tradeHub,
+          active: tradeHub.active,
+          module: tradeHub.module ?? null
         }
       },
       publishMode: game.settings.get(MODULE_ID, "publishAllSidebarData") ? "all-sidebar-data" : "player-visible-sidebar-data",
@@ -1645,10 +1910,12 @@ class FoundryCompanion {
         contacts: contacts.actors.length,
         items: items.items.length,
         characterSheets: characterSheets.actors.length,
-        totalDocuments: quests.length + (gameSessionStory.chapters?.length ?? 0) + journal.entries.length + contacts.actors.length + items.items.length + characterSheets.actors.length
+        tradeHubShips: tradeHub.ships?.length ?? 0,
+        totalDocuments: quests.length + (gameSessionStory.chapters?.length ?? 0) + journal.entries.length + contacts.actors.length + items.items.length + characterSheets.actors.length + (tradeHub.ships?.length ?? 0)
       },
       questLog,
       gameSessionStory,
+      tradeHub,
       journal,
       contacts,
       items,
@@ -1661,6 +1928,9 @@ class FoundryCompanion {
     return {
       questLog: game.settings.get(MODULE_ID, EXPORT_OPTION_SETTINGS.questLog),
       customAbilitiesSkills: game.settings.get(MODULE_ID, EXPORT_OPTION_SETTINGS.customAbilitiesSkills),
+      tradeHub: game.settings.get(MODULE_ID, EXPORT_OPTION_SETTINGS.tradeHub),
+      tradeHubCapital: game.settings.get(MODULE_ID, EXPORT_OPTION_SETTINGS.tradeHubCapital),
+      tradeHubShips: game.settings.get(MODULE_ID, EXPORT_OPTION_SETTINGS.tradeHubShips),
       journal: game.settings.get(MODULE_ID, EXPORT_OPTION_SETTINGS.journal),
       contacts: game.settings.get(MODULE_ID, EXPORT_OPTION_SETTINGS.contacts),
       items: game.settings.get(MODULE_ID, EXPORT_OPTION_SETTINGS.items),
@@ -1864,6 +2134,8 @@ class FoundryCompanion {
       quests: payload.questLog.quests,
       story: payload.gameSessionStory,
       gameSessionStory: payload.gameSessionStory,
+      tradeHub: payload.tradeHub,
+      ships: payload.tradeHub?.ships ?? [],
       meta: {
         schemaVersion: payload.schemaVersion,
         module: payload.module,
@@ -1877,6 +2149,7 @@ class FoundryCompanion {
         navigation: payload.navigation,
         integrations: payload.integrations,
         gameSessionStory: payload.gameSessionStory,
+        tradeHub: payload.tradeHub,
         journalGroups: payload.journal.groups ?? [],
         contactGroups: payload.contacts.groups ?? [],
         itemGroups: payload.items.groups ?? [],

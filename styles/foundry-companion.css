@@ -149,6 +149,12 @@
   letter-spacing: 0.08em;
 }
 
+.foundry-companion-page .preview-subheading {
+  margin: 18px 0 10px;
+  color: #a65f2b;
+  font-size: 1rem;
+}
+
 .foundry-companion-page .quest-section h2 {
   margin: 0 0 12px;
   color: #28666e;
@@ -338,6 +344,26 @@
   border-radius: 6px;
   object-fit: cover;
   border: 1px solid #ded6cc;
+}
+
+.foundry-companion-page .ship-card {
+  align-items: flex-start;
+}
+
+.foundry-companion-page .module-list {
+  margin-top: 8px;
+  padding-left: 0;
+}
+
+.foundry-companion-page .module-list li {
+  justify-content: space-between;
+  border-top: 1px solid #eee5da;
+  padding-top: 4px;
+}
+
+.foundry-companion-page .module-list span {
+  color: #675f59;
+  font-size: 0.82rem;
 }
 
 .foundry-companion-page .record-row h3,

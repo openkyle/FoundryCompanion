@@ -6,7 +6,7 @@
       <p class="meta">{{count}} publishable records. Updated {{updatedAt}}.</p>
       {{#if summary}}
         <p class="meta">
-          Quests {{summary.quests}} · Story {{summary.storyChapters}} · Journal {{summary.journalEntries}} · Contacts {{summary.contacts}} · Items {{summary.items}} · Characters {{summary.characterSheets}}
+          Quests {{summary.quests}} · Story {{summary.storyChapters}} · Journal {{summary.journalEntries}} · Contacts {{summary.contacts}} · Items {{summary.items}} · Characters {{summary.characterSheets}} · Ships {{summary.tradeHubShips}}
         </p>
       {{/if}}
       <p class="meta">Mode: {{publishMode}} · Images: {{imageMode}}</p>
@@ -217,7 +217,48 @@
         {{else}}
           <p class="empty-inline">No publishable character sheets found.</p>
         {{/if}}
+        {{#if tradeHub.ships.length}}
+          <h3 class="preview-subheading">Ships</h3>
+          {{#if tradeHub.capitalDisplay}}<p class="empty-inline">TradeHub Capital: {{tradeHub.capitalDisplay}}</p>{{/if}}
+          {{#if tradeHub.currentLocation}}<p class="empty-inline">Current Location: {{tradeHub.currentLocation}}</p>{{/if}}
+          <div class="record-grid">
+            {{#each tradeHub.ships}}
+              <article class="record-card ship-card">
+                {{#if imageUrl}}<img src="{{imageUrl}}" alt="">{{/if}}
+                <div>
+                  <h3>{{name}}</h3>
+                  <p>HP {{hp.value}}/{{hp.max}} · AC {{ac}} · Cargo {{cargo.current}}/{{cargo.max}}</p>
+                  {{#if modules.length}}
+                    <ul class="module-list">
+                      {{#each modules}}
+                        <li>{{name}} {{#if hp.max}}<span>{{hp.value}}/{{hp.max}} HP</span>{{/if}}</li>
+                      {{/each}}
+                    </ul>
+                  {{/if}}
+                </div>
+              </article>
+            {{/each}}
+          </div>
+        {{/if}}
       </section>
     {{/if}}
+    {{#unless exportOptions.characterSheets}}
+      {{#if tradeHub.ships.length}}
+        <section id="fc-characterSheets" class="preview-section">
+          <h2>Ships</h2>
+          <div class="record-grid">
+            {{#each tradeHub.ships}}
+              <article class="record-card ship-card">
+                {{#if imageUrl}}<img src="{{imageUrl}}" alt="">{{/if}}
+                <div>
+                  <h3>{{name}}</h3>
+                  <p>HP {{hp.value}}/{{hp.max}} · AC {{ac}} · Cargo {{cargo.current}}/{{cargo.max}}</p>
+                </div>
+              </article>
+            {{/each}}
+          </div>
+        </section>
+      {{/if}}
+    {{/unless}}
   </main>
 </section>
