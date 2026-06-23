@@ -30,6 +30,7 @@ FoundryCompanion is built for Foundry first. Forien's Quest Log is an optional i
 - Exported JSON omits empty/default values, raw Foundry/Forien task objects, ownership bookkeeping, active effects, duplicate image paths, and duplicate grouped record bodies.
 - Character sheet summaries export all abilities and skills found in actor data, including custom keys such as `tec`, `cua_0`, or `cus_4`. Use `summary.abilities` / `summary.skills` for compact maps and `summary.abilityDetails` / `summary.skillDetails` for labels/modifiers.
 - Character sheet records include player owner color metadata when available, so the companion website can style player tags from Foundry user colors.
+- Owned player character sheets include a `playerCharacter` block with readable attributes, senses, languages, damage traits, proficiencies, resources, and feature names.
 - When `dnd5e-custom-skills` is active and **Enable Custom Abilities & Skills Exporting** is checked, FoundryCompanion reads `customAbilitiesList`, `customSkillList`, `hiddenAbilities`, and `hiddenSkills` from that module's world setting.
 - Forien's starred primary quest is exported with `mainQuest: true` and `badge: "Main Quest"`.
 - Copies a debug sample to the clipboard so we can wire the exporter to your exact Forien data shape.
@@ -93,6 +94,63 @@ Owned character sheet records may include:
 ```
 
 Use `character.color` as the primary player tag color. If it is missing, fall back to the first `character.playerOwners[].color`.
+
+Owned character sheet records also include `playerCharacter`:
+
+```json
+{
+  "playerCharacter": {
+    "profile": {
+      "level": 6,
+      "race": "Construct",
+      "background": "Charlatan",
+      "size": { "key": "med", "label": "Medium" },
+      "type": { "value": "construct", "label": "Construct", "subtype": "Glitchling" },
+      "classSummary": "Warlock 6 Hexblade",
+      "speedSummary": "30 ft"
+    },
+    "customAbilitiesSkills": {
+      "enabled": true,
+      "active": true,
+      "abilities": { "cua_0": "Tech" },
+      "skills": { "cus_4": "Technology" }
+    },
+    "abilities": [
+      { "key": "str", "label": "STR", "value": 10, "mod": 0, "save": 3, "proficient": 1 },
+      { "key": "cua_0", "label": "TECH", "value": 14, "mod": 2, "save": 2 }
+    ],
+    "skills": [
+      { "key": "cus_4", "label": "Technology", "ability": "cua_0", "value": 5, "mod": 2, "total": 5, "proficient": 1 }
+    ],
+    "attributes": {
+      "hp": { "value": 30, "max": 30 },
+      "ac": 12,
+      "proficiency": 3,
+      "movement": { "walk": 30 },
+      "senses": { "darkvision": 60 }
+    },
+    "traits": {
+      "languages": [{ "key": "common", "label": "Common" }],
+      "damageResistances": [{ "key": "fire", "label": "Fire" }],
+      "weaponProficiencies": [{ "key": "sim", "label": "Simple Weapons" }]
+    },
+    "resources": {
+      "primary": { "label": "Balance Chaos", "value": 3, "max": 3 }
+    },
+    "classes": {
+      "classes": [{ "id": "item-id", "name": "Warlock", "levels": 6, "hitDice": "d8", "hitDiceUsed": 0 }],
+      "subclasses": [{ "id": "item-id", "name": "Hexblade", "classIdentifier": "warlock" }]
+    },
+    "features": [
+      { "id": "item-id", "name": "Pact Boon", "type": "feat", "imageUrl": "https://..." }
+    ]
+  }
+}
+```
+
+The `playerCharacter` block is only sent for owned player characters in `characterSheets.actors`, not for Contacts.
+
+When **Enable Custom Abilities & Skills Exporting** is checked and `dnd5e-custom-skills` is active, custom ability keys such as `cua_0` and custom skill keys such as `cus_4` are included in `playerCharacter.abilities` and `playerCharacter.skills` with their configured labels.
 
 ## Companion website publishing
 

@@ -1038,7 +1038,7 @@ class FoundryCompanion {
     const actors = game.actors.contents
       .filter((actor) => actor.type === "character")
       .filter((actor) => this.shouldPublishCharacterSheet(actor))
-      .map((actor) => this.serializeActor(actor, { includeItems: true }))
+      .map((actor) => this.serializeActor(actor, { includeItems: true, includePlayerCharacterData: true }))
       .sort(this.sortByFolderThenName);
 
     return {
@@ -1300,7 +1300,7 @@ class FoundryCompanion {
     });
   }
 
-  static serializeActor(actor, { includeItems = false, includeEffects = false } = {}) {
+  static serializeActor(actor, { includeItems = false, includeEffects = false, includePlayerCharacterData = false } = {}) {
     const base = this.serializeDocumentBase(actor);
     const isCharacter = actor.type === "character";
     if (isCharacter) delete base.type;
@@ -1313,6 +1313,7 @@ class FoundryCompanion {
       imageUrl: this.resolveAssetUrl(actor.img ?? ""),
       description: this.actorDescription(system),
       summary: this.summarizeActorSystem(system),
+      playerCharacter: includePlayerCharacterData && isCharacter ? this.summarizePlayerCharacterSheet(actor, system) : {},
       items: includeItems ? actor.items.contents.map((item) => this.serializeEmbeddedItem(item)) : [],
       effects: includeEffects ? actor.effects.contents.map((effect) => this.serializeActiveEffect(effect)) : []
     });
@@ -1396,6 +1397,145 @@ class FoundryCompanion {
       currency: this.compactObject(system.currency),
       resources: this.compactObject(system.resources)
     });
+  }
+
+  static summarizePlayerCharacterSheet(actor, system) {
+    const customConfig = this.customAbilitiesSkillsConfig();
+    return this.compactObject({
+      profile: this.summarizeCharacterProfile(actor, system),
+      customAbilitiesSkills: this.summarizeCustomAbilitiesSkillsIntegration(customConfig),
+      abilities: this.summarizeAbilityDetails(system.abilities, customConfig),
+      skills: this.summarizeSkillDetails(system.skills, customConfig),
+      attributes: this.summarizeCharacterAttributes(system.attributes ?? {}),
+      traits: this.summarizeCharacterTraits(system.traits ?? {}),
+      resources: this.summarizeCharacterResources(system.resources ?? {}),
+      classes: this.summarizeCharacterClasses(actor.items?.contents ?? []),
+      features: this.summarizeCharacterFeatures(actor.items?.contents ?? [])
+    });
+  }
+
+  static summarizeCustomAbilitiesSkillsIntegration(customConfig = {}) {
+    return this.compactObject({
+      enabled: Boolean(customConfig.enabled),
+      active: Boolean(customConfig.active),
+      module: customConfig.module,
+      abilities: customConfig.abilities,
+      skills: customConfig.skills
+    });
+  }
+
+  static summarizeCharacterProfile(actor, system) {
+    const details = system.details ?? {};
+    const traits = system.traits ?? {};
+    const type = details.type ?? {};
+    return this.compactObject({
+      level: details.level,
+      xp: this.compactObject(details.xp),
+      race: this.textFromValue(details.race),
+      background: this.textFromValue(details.background),
+      alignment: details.alignment,
+      size: this.traitEntry(traits.size, this.dnd5eLabels("actorSizes")),
+      type: this.compactObject({
+        value: this.textFromValue(type.value ?? type),
+        label: this.textFromValue(type.label ?? type.value ?? type),
+        subtype: this.textFromValue(type.subtype),
+        swarm: type.swarm
+      }),
+      classSummary: this.textFromValue(this.firstValue(actor.labels?.classes, actor.system?.details?.class, "")),
+      speedSummary: this.textFromValue(this.firstValue(actor.labels?.speed, actor.system?.attributes?.speed, ""))
+    });
+  }
+
+  static summarizeCharacterAttributes(attributes) {
+    return this.compactObject({
+      hp: this.compactObject(attributes.hp),
+      ac: this.firstValue(attributes.ac?.value, attributes.ac?.flat, attributes.ac),
+      initiative: this.compactObject(attributes.init),
+      proficiency: attributes.prof,
+      exhaustion: attributes.exhaustion,
+      inspiration: attributes.inspiration,
+      spellcasting: attributes.spellcasting,
+      movement: this.compactObject(attributes.movement),
+      senses: this.compactObject(attributes.senses)
+    });
+  }
+
+  static summarizeCharacterTraits(traits) {
+    return this.compactObject({
+      size: traits.size,
+      languages: this.traitEntries(traits.languages, this.dnd5eLabels("languages")),
+      damageImmunities: this.traitEntries(traits.di, this.dnd5eLabels("damageTypes")),
+      damageResistances: this.traitEntries(traits.dr, this.dnd5eLabels("damageTypes")),
+      damageVulnerabilities: this.traitEntries(traits.dv, this.dnd5eLabels("damageTypes")),
+      conditionImmunities: this.traitEntries(traits.ci, this.dnd5eLabels("conditionTypes")),
+      weaponProficiencies: this.traitEntries(traits.weaponProf, this.dnd5eLabels("weaponProficiencies")),
+      armorProficiencies: this.traitEntries(traits.armorProf, this.dnd5eLabels("armorProficiencies")),
+      toolProficiencies: this.traitEntries(traits.toolProf, this.dnd5eLabels("toolProficiencies"))
+    });
+  }
+
+  static summarizeCharacterResources(resources) {
+    if (!resources || typeof resources !== "object") return {};
+    return Object.fromEntries(
+      Object.entries(resources)
+        .map(([key, value]) => [key, this.compactObject({
+          label: value?.label,
+          value: value?.value,
+          max: value?.max,
+          sr: Boolean(value?.sr),
+          lr: Boolean(value?.lr)
+        })])
+        .filter(([, value]) => value && Object.keys(value).length)
+    );
+  }
+
+  static summarizeCharacterClasses(items) {
+    const classes = items
+      .filter((item) => item.type === "class")
+      .map((item) => {
+        const system = item.system ?? item.data?.data ?? {};
+        return this.compactObject({
+          id: item.id,
+          name: item.name,
+          levels: system.levels,
+          hitDice: system.hitDice,
+          hitDiceUsed: system.hitDiceUsed,
+          spellcasting: system.spellcasting,
+          subclass: system.subclass
+        });
+      })
+      .filter((entry) => entry.name);
+    const subclasses = items
+      .filter((item) => item.type === "subclass")
+      .map((item) => {
+        const system = item.system ?? item.data?.data ?? {};
+        return this.compactObject({
+          id: item.id,
+          name: item.name,
+          classIdentifier: system.classIdentifier,
+          classItem: system.classIdentifier ?? system.class
+        });
+      })
+      .filter((entry) => entry.name);
+    return this.compactObject({ classes, subclasses });
+  }
+
+  static summarizeCharacterFeatures(items) {
+    const featureTypes = new Set(["background", "class", "feat", "race", "species", "subclass", "trait"]);
+    return items
+      .filter((item) => featureTypes.has(item.type))
+      .map((item) => {
+        const system = item.system ?? item.data?.data ?? {};
+        return this.compactObject({
+          id: item.id,
+          name: item.name,
+          type: item.type,
+          imageUrl: this.resolveAssetUrl(item.img ?? ""),
+          uses: this.compactObject(system.uses),
+          requirements: system.requirements
+        });
+      })
+      .filter((feature) => feature.name);
   }
 
   static summarizeItemSystem(system) {
@@ -1560,6 +1700,31 @@ class FoundryCompanion {
     if (Array.isArray(value.value)) return [...value.value, value.custom].filter(Boolean);
     if (typeof value === "object") return Object.entries(value).filter(([, enabled]) => enabled).map(([key]) => key);
     return value;
+  }
+
+  static traitEntries(value, labels = {}) {
+    const keys = this.listValues(value);
+    const list = Array.isArray(keys) ? keys : [keys].filter(Boolean);
+    return list.map((entry) => this.traitEntry(entry, labels)).filter(Boolean);
+  }
+
+  static traitEntry(entry, labels = {}) {
+    if (entry && typeof entry === "object") {
+      const key = entry.value ?? entry.key ?? entry.id ?? "";
+      return this.compactObject({
+        key,
+        label: this.textFromValue(this.firstValue(entry.label, entry.name, labels[key], key)),
+        custom: Boolean(entry.custom)
+      });
+    }
+    const key = String(entry ?? "").trim();
+    if (!key) return null;
+    const isCustom = !labels[key] && !labels[key.toLowerCase?.()];
+    return this.compactObject({
+      key: isCustom ? "" : key,
+      label: this.textFromValue(labels[key] ?? labels[key.toLowerCase?.()] ?? key),
+      custom: isCustom
+    });
   }
 
   static compactObject(value) {
