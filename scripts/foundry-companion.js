@@ -931,11 +931,7 @@ class FoundryCompanion {
   static collectContacts() {
     const actors = game.actors.contents
       .filter((actor) => this.shouldPublishSidebarDocument(actor, "LIMITED"))
-      .map((actor) => {
-        const contact = this.serializeActor(actor);
-        delete contact.type;
-        return contact;
-      })
+      .map((actor) => this.serializeContact(actor))
       .sort(this.sortByFolderThenName);
 
     return {
@@ -943,6 +939,60 @@ class FoundryCompanion {
       groups: this.groupByFolder(actors),
       actors
     };
+  }
+
+  static serializeContact(actor) {
+    if (actor.type === "group") return this.serializeGroupContact(actor);
+    const contact = this.serializeActor(actor);
+    delete contact.type;
+    return contact;
+  }
+
+  static serializeGroupContact(actor) {
+    const system = actor.system ?? actor.data?.data ?? {};
+    return this.compactObject({
+      id: actor.id,
+      name: actor.name,
+      type: "group",
+      sort: actor.sort,
+      order: actor.sort,
+      imageUrl: this.resolveAssetUrl(actor.img ?? ""),
+      folder: this.serializeFolderRef(actor.folder),
+      description: this.actorDescription(system),
+      members: this.serializeGroupMembers(actor)
+    });
+  }
+
+  static serializeGroupMembers(actor) {
+    const system = actor.system ?? actor.data?.data ?? {};
+    const rawMembers = this.firstValue(system.members, system.memberData, actor.members?.contents, actor.members, []);
+    const list = Array.isArray(rawMembers) ? rawMembers : Object.values(rawMembers ?? {});
+    return list
+      .map((member) => this.serializeGroupMember(member))
+      .filter((member) => member.name)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  static serializeGroupMember(member) {
+    if (typeof member === "string") {
+      const document = this.resolveActorReference(member);
+      return this.compactObject({ name: document?.name ?? member });
+    }
+
+    const document = this.resolveActorReference(this.firstValue(
+      member?.uuid,
+      member?.actorUuid,
+      member?.actor?.uuid,
+      member?.id,
+      member?.actorId,
+      member?._id
+    ));
+    return this.compactObject({
+      id: document?.id ?? member?.id ?? member?.actorId ?? member?._id ?? "",
+      name: document?.name ?? this.textFromValue(this.firstValue(member?.name, member?.label, member?.title, member?.text, "")),
+      imageUrl: this.resolveAssetUrl(document?.img ?? member?.img ?? member?.image ?? ""),
+      quantity: Number(this.firstValue(member?.quantity, member?.qty, 1))
+    });
   }
 
   static collectItems() {
@@ -1048,6 +1098,10 @@ class FoundryCompanion {
       .filter((item) => ["equipment", "weapon"].includes(item.type))
       .map((item) => this.serializeTradeHubModule(item))
       .sort((a, b) => a.name.localeCompare(b.name));
+    const cargoItems = this.tradeHubShipItems(source)
+      .filter((item) => ["consumable", "loot"].includes(item.type))
+      .map((item) => this.serializeTradeHubCargoItem(item))
+      .sort((a, b) => a.name.localeCompare(b.name));
     const cargo = this.tradeHubCargoStats(source, system);
     const hp = this.tradeHubHp(system.attributes?.hp);
     const shieldHp = modules
@@ -1068,6 +1122,8 @@ class FoundryCompanion {
       hp,
       ac: this.firstValue(system.attributes?.ac?.value, system.attributes?.ac?.flat, system.attributes?.ac),
       cargo,
+      crew: this.serializeTradeHubRoster(system.cargo?.crew),
+      passengers: this.serializeTradeHubRoster(system.cargo?.passengers),
       meta: this.compactObject({
         size: system.traits?.size,
         vehicleType: system.traits?.vehicleType,
@@ -1078,7 +1134,8 @@ class FoundryCompanion {
         hyperdrive: this.tradeHubHyperdriveText(source),
         biography: this.cleanHtml(system.details?.biography?.public ?? "")
       }),
-      modules
+      modules,
+      cargoItems
     });
   }
 
@@ -1098,6 +1155,41 @@ class FoundryCompanion {
       equipped: system.equipped,
       description: this.cleanHtml(system.description?.value ?? system.description ?? "")
     });
+  }
+
+  static serializeTradeHubCargoItem(item) {
+    const system = item.system ?? {};
+    const quantity = Number(system.quantity ?? item.quantity ?? 0);
+    const weight = Number(system.weight ?? item.weight ?? 0);
+    const value = this.parseNumber(system.price?.value ?? system.price);
+    return this.compactObject({
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      imageUrl: this.resolveAssetUrl(item.img ?? ""),
+      quantity,
+      weight,
+      totalWeight: quantity * weight,
+      value,
+      totalValue: quantity * value,
+      price: this.compactObject(system.price),
+      description: this.cleanHtml(system.description?.value ?? system.description ?? "")
+    });
+  }
+
+  static serializeTradeHubRoster(roster) {
+    if (!roster) return [];
+    const list = Array.isArray(roster) ? roster : Object.values(roster);
+    return list.map((entry) => {
+      if (typeof entry === "string") return this.compactObject({ name: entry, quantity: 1 });
+      return this.compactObject({
+        id: entry.id ?? entry._id ?? "",
+        name: this.textFromValue(this.firstValue(entry.name, entry.label, entry.title, entry.text, "")),
+        quantity: Number(this.firstValue(entry.quantity, entry.qty, 1)),
+        role: this.textFromValue(this.firstValue(entry.role, entry.job, entry.position, "")),
+        ability: this.textFromValue(this.firstValue(entry.ability, entry.abilityKey, ""))
+      });
+    }).filter((entry) => entry.name);
   }
 
   static tradeHubShipItems(ship) {
@@ -1750,6 +1842,22 @@ class FoundryCompanion {
   static textFromValue(value) {
     if (!value || typeof value !== "object") return String(value ?? "");
     return String(this.firstValue(value.name, value.title, value.label, value.text, ""));
+  }
+
+  static resolveActorReference(value) {
+    if (!value) return null;
+    if (typeof value === "object") return value;
+    const text = String(value);
+    if (text.startsWith("Actor.")) return game.actors.get(text.split(".").pop());
+    if (text.includes(".")) {
+      try {
+        const document = globalThis.fromUuidSync?.(text);
+        if (document?.documentName === "Actor" || document?.type) return document;
+      } catch {
+        return null;
+      }
+    }
+    return game.actors.get(text) ?? null;
   }
 
   static parseNumber(value) {

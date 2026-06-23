@@ -17,12 +17,13 @@ FoundryCompanion is built for Foundry first. Forien's Quest Log is an optional i
 - Includes a GM setting to publish either player-visible sidebar content only, or all standard Foundry sidebar data.
 - Includes **Configure Export Options** checkboxes for Enable Forien Quest Log Exporting, Journal, Contacts, Items, and Character Sheets.
 - Includes optional **5e - Custom Abilities & Skills** (`dnd5e-custom-skills`) support for custom ability and skill labels.
-- Includes optional **TradeHub Markets** (`tradehub-markets`) read-only export for TradeHub Capital, current location, and owned party ships with modules, HP, AC, cargo, and lightweight ship metadata.
+- Includes optional **TradeHub Markets** (`tradehub-markets`) read-only export for TradeHub Capital, current location, and owned party ships with modules, HP, AC, cargo items, crew, passengers, and lightweight ship metadata.
 - Lets the GM choose one Journal Entry as the **Game Session Story** source; each page exports directly as an individual rich-text chapter/session with image references.
 - Game Session Story supports a Chapter/Session label setting, continuous downward reading, and bookmark/return metadata for the companion website.
 - Image export mode can use image links for smaller payloads or image embedding for larger, portable payloads.
 - GM preview uses simple expandable folder/group dropdowns to verify exported data.
 - Contacts and character sheets are grouped by Foundry folder path.
+- Foundry `group` actors in Contacts export as lightweight contact groups: name, image, description, and member names only.
 - Items are grouped by holder, including owned character inventories and world items.
 - Quest preview shows objectives.
 - Export schema v8 keeps only human-readable summaries, descriptions, images, folders, objectives, rewards, story chapters, TradeHub ship summaries, and readable sheet fields.
@@ -54,6 +55,8 @@ Game Session Story is different from the general Journal sidebar. It is an expli
 
 By default, Contacts and world Items are also ownership-gated. Any document visible to at least one non-GM player at Limited permission or higher is included. Character Sheets includes only `character` actors owned by at least one non-GM player.
 
+Foundry `group` actors exported through Contacts intentionally omit full actor stats. They include only the group name, image, description, folder, and member names/quantities so the companion website can display galactic contact organizations without duplicating the separate character/contact records.
+
 Actor inventories are exported only for owned player characters. If an actor is not an owned player character, it can still be listed as a Contact, but its embedded items are not exported as inventory.
 
 Use **Sidebar Data Scope** to choose exactly one mode:
@@ -70,7 +73,7 @@ Use **Image Export Mode** to choose exactly one mode:
 
 Use **Configure Export Options** in the FoundryCompanion panel to choose which sections are included in the companion website payload. Unchecked sections are omitted from navigation and exported as empty section payloads.
 
-TradeHub Markets export is read-only. FoundryCompanion publishes TradeHub Capital, current location, and owned party ships with modules/HP/cargo metadata. It does not publish live markets, buy/sell goods, shipyard inventory, predictive rumours, transaction history, or repair/action controls.
+TradeHub Markets export is read-only. FoundryCompanion publishes TradeHub Capital, current location, and owned party ships with modules/HP/cargo metadata, cargo items, crew, and passengers. Cargo items are vehicle `consumable` and `loot` items, not installed equipment modules. It does not publish live markets, buy/sell goods, shipyard inventory, predictive rumours, transaction history, or repair/action controls.
 
 In exported/published schema v8 payloads, folder/status groups use ID references instead of duplicating full records. Read full records from `journal.entries`, `contacts.actors`, `items.items`, `characterSheets.actors`, `questLog.quests`, `gameSessionStory.chapters`, and `tradeHub.ships`; use group `recordIds` or `questIds` to reconstruct display sections.
 
@@ -261,6 +264,31 @@ The **Export JSON snapshot** button still downloads the full local payload with:
             "quantity": 1,
             "weight": 0,
             "value": 5000
+          }
+        ],
+        "cargoItems": [
+          {
+            "id": "cargo-id",
+            "name": "Hydrogen Fuel",
+            "type": "consumable",
+            "imageUrl": "https://...",
+            "quantity": 4,
+            "weight": 100,
+            "totalWeight": 400,
+            "value": 1000,
+            "totalValue": 4000
+          }
+        ],
+        "crew": [
+          {
+            "name": "(Cha) Captain: Jimothy Fakename",
+            "quantity": 1
+          }
+        ],
+        "passengers": [
+          {
+            "name": "Passenger Name",
+            "quantity": 1
           }
         ]
       }

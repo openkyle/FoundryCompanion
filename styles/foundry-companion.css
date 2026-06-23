@@ -355,6 +355,14 @@
   padding-left: 0;
 }
 
+.foundry-companion-page .ship-list-heading {
+  margin: 10px 0 0;
+  color: #a65f2b;
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 .foundry-companion-page .module-list li {
   justify-content: space-between;
   border-top: 1px solid #eee5da;

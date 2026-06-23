@@ -148,6 +148,14 @@
                       {{#if imageUrl}}<img src="{{imageUrl}}" alt="">{{/if}}
                       <div>
                         <h3>{{name}}</h3>
+                        {{#if description}}<div class="record-content">{{{description}}}</div>{{/if}}
+                        {{#if members.length}}
+                          <ul class="module-list">
+                            {{#each members}}
+                              <li>{{name}} {{#if quantity}}<span>Qty {{quantity}}</span>{{/if}}</li>
+                            {{/each}}
+                          </ul>
+                        {{/if}}
                       </div>
                     </article>
                   {{/each}}
@@ -229,9 +237,26 @@
                   <h3>{{name}}</h3>
                   <p>HP {{hp.value}}/{{hp.max}} · AC {{ac}} · Cargo {{cargo.current}}/{{cargo.max}}</p>
                   {{#if modules.length}}
+                    <h4 class="ship-list-heading">Modules</h4>
                     <ul class="module-list">
                       {{#each modules}}
                         <li>{{name}} {{#if hp.max}}<span>{{hp.value}}/{{hp.max}} HP</span>{{/if}}</li>
+                      {{/each}}
+                    </ul>
+                  {{/if}}
+                  {{#if cargoItems.length}}
+                    <h4 class="ship-list-heading">Cargo</h4>
+                    <ul class="module-list">
+                      {{#each cargoItems}}
+                        <li>{{name}} <span>Qty {{quantity}} · {{value}} GP</span></li>
+                      {{/each}}
+                    </ul>
+                  {{/if}}
+                  {{#if crew.length}}
+                    <h4 class="ship-list-heading">Crew</h4>
+                    <ul class="module-list">
+                      {{#each crew}}
+                        <li>{{name}} <span>Qty {{quantity}}</span></li>
                       {{/each}}
                     </ul>
                   {{/if}}
