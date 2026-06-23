@@ -29,6 +29,7 @@ FoundryCompanion is built for Foundry first. Forien's Quest Log is an optional i
 - Export schema v8 keeps only human-readable summaries, descriptions, images, folders, objectives, rewards, story chapters, TradeHub ship summaries, and readable sheet fields.
 - Exported JSON omits empty/default values, raw Foundry/Forien task objects, ownership bookkeeping, active effects, duplicate image paths, and duplicate grouped record bodies.
 - Character sheet summaries export all abilities and skills found in actor data, including custom keys such as `tec`, `cua_0`, or `cus_4`. Use `summary.abilities` / `summary.skills` for compact maps and `summary.abilityDetails` / `summary.skillDetails` for labels/modifiers.
+- Character sheet records include player owner color metadata when available, so the companion website can style player tags from Foundry user colors.
 - When `dnd5e-custom-skills` is active and **Enable Custom Abilities & Skills Exporting** is checked, FoundryCompanion reads `customAbilitiesList`, `customSkillList`, `hiddenAbilities`, and `hiddenSkills` from that module's world setting.
 - Forien's starred primary quest is exported with `mainQuest: true` and `badge: "Main Quest"`.
 - Copies a debug sample to the clipboard so we can wire the exporter to your exact Forien data shape.
@@ -78,6 +79,20 @@ TradeHub Markets export is read-only. FoundryCompanion publishes TradeHub Capita
 In exported/published schema v8 payloads, folder/status groups use ID references instead of duplicating full records. Read full records from `journal.entries`, `contacts.actors`, `items.items`, `characterSheets.actors`, `questLog.quests`, `gameSessionStory.chapters`, and `tradeHub.ships`; use group `recordIds` or `questIds` to reconstruct display sections.
 
 Journal entries, Journal pages, folders, and Game Session Story chapters include Foundry `sort`/`order` metadata when available. The companion website should preserve received array order or sort by `order`; do not alphabetize Journal pages if Foundry order matters.
+
+Owned character sheet records may include:
+
+```json
+{
+  "name": "Rubi Conundrum",
+  "color": "#33aaff",
+  "playerOwners": [
+    { "id": "foundry-user-id", "name": "Player Name", "color": "#33aaff", "active": true }
+  ]
+}
+```
+
+Use `character.color` as the primary player tag color. If it is missing, fall back to the first `character.playerOwners[].color`.
 
 ## Companion website publishing
 

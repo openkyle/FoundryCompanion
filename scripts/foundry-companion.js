@@ -1302,10 +1302,14 @@ class FoundryCompanion {
 
   static serializeActor(actor, { includeItems = false, includeEffects = false } = {}) {
     const base = this.serializeDocumentBase(actor);
-    if (actor.type === "character") delete base.type;
+    const isCharacter = actor.type === "character";
+    if (isCharacter) delete base.type;
     const system = actor.system ?? actor.data?.data ?? {};
+    const playerOwners = isCharacter ? this.actorPlayerOwners(actor) : [];
     return this.compactObject({
       ...base,
+      color: isCharacter ? this.actorDisplayColor(actor, playerOwners) : "",
+      playerOwners,
       imageUrl: this.resolveAssetUrl(actor.img ?? ""),
       description: this.actorDescription(system),
       summary: this.summarizeActorSystem(system),
@@ -1798,6 +1802,43 @@ class FoundryCompanion {
   static permissionConstant(name) {
     const levels = CONST.DOCUMENT_OWNERSHIP_LEVELS ?? CONST.DOCUMENT_PERMISSION_LEVELS;
     return levels?.[name] ?? 0;
+  }
+
+  static actorPlayerOwners(actor) {
+    const owner = this.permissionConstant("OWNER");
+    return game.users.contents
+      .filter((user) => !user.isGM)
+      .filter((user) => this.permissionLevel(actor, user) >= owner)
+      .map((user) => this.compactObject({
+        id: user.id,
+        name: user.name,
+        color: this.normalizeColor(this.firstValue(user.color, user.data?.color, user._source?.color, "")),
+        active: Boolean(user.active)
+      }))
+      .filter((ownerUser) => ownerUser && Object.keys(ownerUser).length);
+  }
+
+  static actorDisplayColor(actor, playerOwners = []) {
+    return this.normalizeColor(this.firstValue(
+      playerOwners.find((ownerUser) => ownerUser.color)?.color,
+      actor.getFlag?.(MODULE_ID, "color"),
+      actor.getFlag?.("core", "color"),
+      actor.flags?.[MODULE_ID]?.color,
+      actor.flags?.core?.color,
+      actor.prototypeToken?.texture?.tint,
+      actor.prototypeToken?.ring?.colors?.ring,
+      actor.prototypeToken?.ring?.colors?.background,
+      ""
+    ));
+  }
+
+  static normalizeColor(value) {
+    if (value === undefined || value === null || value === "") return "";
+    const text = String(value).trim();
+    if (!text) return "";
+    if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(text)) return text;
+    if (/^[0-9a-f]{3}([0-9a-f]{3})?$/i.test(text)) return `#${text}`;
+    return text;
   }
 
   static normalizeList(value, { reward = false } = {}) {
