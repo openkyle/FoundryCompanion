@@ -57,6 +57,14 @@
       Use image embedding
     </label>
     <p class="option-note">Embeds base64 image data in the payload. More portable, but creates large data transfers.</p>
+    <label>
+      <input type="checkbox" data-absolute-image-links {{#if absoluteImageLinks}}checked{{/if}}>
+      Use full links for relative images
+    </label>
+    <p class="option-note">Default on. Converts relative Foundry image paths into full URLs before publishing, so external websites can load them.</p>
+    <label for="foundry-companion-core-image-base">Core image base URL</label>
+    <input id="foundry-companion-core-image-base" type="url" value="{{coreImageBaseUrl}}" data-core-image-base-url>
+    <p class="option-note">Used for core icon paths such as <code>icons/svg/mystery-man.svg</code>.</p>
   </fieldset>
   <fieldset class="foundry-companion-options">
     <legend>Configure Export Options</legend>

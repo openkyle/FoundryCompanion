@@ -21,6 +21,7 @@ FoundryCompanion is built for Foundry first. Forien's Quest Log is an optional i
 - Lets the GM choose one Journal Entry as the **Game Session Story** source; each page exports directly as an individual rich-text chapter/session with image references.
 - Game Session Story supports a Chapter/Session label setting, continuous downward reading, and bookmark/return metadata for the companion website.
 - Image export mode can use image links for smaller payloads or image embedding for larger, portable payloads.
+- Linked image exports default to full external URLs. Core Foundry paths such as `icons/...` use the configured core image base URL, which defaults to `https://assets.forge-vtt.com/bazaar/core/`.
 - GM preview uses simple expandable folder/group dropdowns to verify exported data.
 - Contacts and character sheets are grouped by Foundry folder path.
 - Foundry `group` actors in Contacts export as lightweight contact groups: name, image, description, and member names only.
@@ -72,6 +73,12 @@ Use **Image Export Mode** to choose exactly one mode:
 
 - **Use image links** keeps payloads smaller, but the companion website must be able to load images from Foundry URLs.
 - **Use image embedding** embeds base64 image data in the payload, making it more portable but much larger.
+
+When **Use full links for relative images** is checked, FoundryCompanion rewrites relative image fields and rich-text `<img src>` paths before publishing:
+
+- Existing `https:`, `http:`, `data:`, and `blob:` URLs are left unchanged.
+- Core Foundry asset paths such as `icons/svg/mystery-man.svg` become `https://assets.forge-vtt.com/bazaar/core/icons/svg/mystery-man.svg` by default.
+- Other relative paths, such as world/module/system images, become full Foundry URLs using Foundry's route helper when available.
 
 Use **Configure Export Options** in the FoundryCompanion panel to choose which sections are included in the companion website payload. Unchecked sections are omitted from navigation and exported as empty section payloads.
 
@@ -232,6 +239,10 @@ The **Export JSON snapshot** button still downloads the full local payload with:
   "generatedAt": "2026-06-15T00:00:00.000Z",
   "publishMode": "player-visible-sidebar-data",
   "imageMode": "linked",
+  "imageLinkOptions": {
+    "absoluteImageLinks": true,
+    "coreImageBaseUrl": "https://assets.forge-vtt.com/bazaar/core/"
+  },
   "exportOptions": {
     "questLog": true,
     "customAbilitiesSkills": true,
@@ -242,7 +253,9 @@ The **Export JSON snapshot** button still downloads the full local payload with:
     "contacts": true,
     "items": true,
     "characterSheets": true,
-    "embedImageData": false
+    "embedImageData": false,
+    "absoluteImageLinks": true,
+    "coreImageBaseUrl": "https://assets.forge-vtt.com/bazaar/core/"
   },
   "imageDataEmbedded": false,
   "navigation": [

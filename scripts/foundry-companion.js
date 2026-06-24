@@ -1,6 +1,7 @@
 const MODULE_ID = "foundry-companion";
 const MIN_PERMISSION = "LIMITED";
 const CONNECTION_KEY_PREFIX = "fc1_";
+const DEFAULT_CORE_IMAGE_BASE_URL = "https://assets.forge-vtt.com/bazaar/core/";
 
 const QUEST_STATUS_LABELS = {
   active: "In Progress",
@@ -153,6 +154,26 @@ Hooks.once("init", () => {
     restricted: true,
     type: Boolean,
     default: false
+  });
+
+  game.settings.register(MODULE_ID, "absoluteImageLinks", {
+    name: "Use full links for relative images",
+    hint: "When image links are used, convert relative Foundry image paths into full external URLs before publishing.",
+    scope: "world",
+    config: false,
+    restricted: true,
+    type: Boolean,
+    default: true
+  });
+
+  game.settings.register(MODULE_ID, "coreImageBaseUrl", {
+    name: "Core image base URL",
+    hint: "Base URL used for Foundry core assets such as icons/... when publishing linked images.",
+    scope: "world",
+    config: false,
+    restricted: true,
+    type: String,
+    default: DEFAULT_CORE_IMAGE_BASE_URL
   });
 
   game.settings.register(MODULE_ID, EXPORT_OPTION_SETTINGS.questLog, {
@@ -321,6 +342,8 @@ class FoundryCompanionMenu extends FormApplication {
       exportOptions: payload.exportOptions,
       publishMode: payload.publishMode,
       imageMode: payload.imageMode,
+      absoluteImageLinks: game.settings.get(MODULE_ID, "absoluteImageLinks"),
+      coreImageBaseUrl: game.settings.get(MODULE_ID, "coreImageBaseUrl"),
       refreshMinutes: Math.max(1, Number(game.settings.get(MODULE_ID, "refreshSeconds") || 1)),
       storyLabelOptions: FoundryCompanion.storyLabelOptions(),
       storyJournalOptions: FoundryCompanion.storyJournalOptions()
@@ -364,6 +387,16 @@ class FoundryCompanionMenu extends FormApplication {
     });
     html.find("[data-image-mode]").on("change", async (event) => {
       await game.settings.set(MODULE_ID, "embedImageData", event.currentTarget.value === "embedded");
+      this.render(false);
+      FoundryCompanion.refreshOpenApps();
+    });
+    html.find("[data-absolute-image-links]").on("change", async (event) => {
+      await game.settings.set(MODULE_ID, "absoluteImageLinks", event.currentTarget.checked);
+      this.render(false);
+      FoundryCompanion.refreshOpenApps();
+    });
+    html.find("[data-core-image-base-url]").on("change", async (event) => {
+      await game.settings.set(MODULE_ID, "coreImageBaseUrl", event.currentTarget.value.trim() || DEFAULT_CORE_IMAGE_BASE_URL);
       this.render(false);
       FoundryCompanion.refreshOpenApps();
     });
@@ -2036,13 +2069,27 @@ class FoundryCompanion {
 
   static resolveAssetUrl(value) {
     if (!value) return "";
-    const src = String(value);
+    const src = String(value).trim();
     if (/^(https?:|data:|blob:)/i.test(src)) return src;
+    if (!game.settings.get(MODULE_ID, "absoluteImageLinks")) return src;
+    if (this.isCoreAssetPath(src)) return this.joinUrl(game.settings.get(MODULE_ID, "coreImageBaseUrl") || DEFAULT_CORE_IMAGE_BASE_URL, src.replace(/^\/+/, ""));
     try {
-      return new URL(src, window.location.href).href;
+      const routed = foundry.utils?.getRoute?.(src) ?? src;
+      return new URL(routed, window.location.origin).href;
     } catch {
       return src;
     }
+  }
+
+  static isCoreAssetPath(value) {
+    const src = String(value ?? "").replace(/^\/+/, "");
+    return /^(icons|ui|fonts|textures|video)\//i.test(src);
+  }
+
+  static joinUrl(base, path) {
+    const normalizedBase = String(base || DEFAULT_CORE_IMAGE_BASE_URL).replace(/\/+$/, "");
+    const normalizedPath = String(path || "").replace(/^\/+/, "");
+    return `${normalizedBase}/${normalizedPath}`;
   }
 
   static textFromValue(value) {
@@ -2102,6 +2149,10 @@ class FoundryCompanion {
         if (/^on/i.test(name)) node.removeAttribute(attr.name);
         if (urlAttributes.has(name) && /^(javascript|vbscript):/i.test(text)) node.removeAttribute(attr.name);
         if (urlAttributes.has(name) && /^data:text\/html/i.test(text)) node.removeAttribute(attr.name);
+        if (["src", "xlink:href"].includes(name) && text && node.hasAttribute(attr.name)) {
+          const resolved = this.resolveAssetUrl(text);
+          if (resolved) node.setAttribute(attr.name, resolved);
+        }
       });
     });
     return div.innerHTML.trim();
@@ -2215,6 +2266,10 @@ class FoundryCompanion {
       publishMode: game.settings.get(MODULE_ID, "publishAllSidebarData") ? "all-sidebar-data" : "player-visible-sidebar-data",
       imageMode: game.settings.get(MODULE_ID, "embedImageData") ? "embedded" : "linked",
       exportOptions,
+      imageLinkOptions: this.compactObject({
+        absoluteImageLinks: game.settings.get(MODULE_ID, "absoluteImageLinks"),
+        coreImageBaseUrl: game.settings.get(MODULE_ID, "coreImageBaseUrl") || DEFAULT_CORE_IMAGE_BASE_URL
+      }),
       imageDataEmbedded: false,
       navigation,
       summary: {
@@ -2250,6 +2305,8 @@ class FoundryCompanion {
       items: game.settings.get(MODULE_ID, EXPORT_OPTION_SETTINGS.items),
       characterSheets: game.settings.get(MODULE_ID, EXPORT_OPTION_SETTINGS.characterSheets),
       embedImageData: game.settings.get(MODULE_ID, "embedImageData"),
+      absoluteImageLinks: game.settings.get(MODULE_ID, "absoluteImageLinks"),
+      coreImageBaseUrl: game.settings.get(MODULE_ID, "coreImageBaseUrl") || DEFAULT_CORE_IMAGE_BASE_URL,
       publishAllSidebarData: game.settings.get(MODULE_ID, "publishAllSidebarData")
     };
   }

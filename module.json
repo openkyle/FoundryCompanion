@@ -2,7 +2,7 @@
   "id": "foundry-companion",
   "title": "FoundryCompanion",
   "description": "GM-published campaign companion data for a read-only player website.",
-  "version": "0.3.1-rc.14",
+  "version": "0.3.1-rc.16",
   "compatibility": {
     "minimum": "11",
     "verified": "11",
@@ -36,7 +36,7 @@
     "styles/foundry-companion.css"
   ],
   "socket": false,
-  "url": "https://github.com/edgedoggo/FoundryCompanion",
-  "manifest": "https://github.com/edgedoggo/FoundryCompanion/releases/download/latest/module.json",
-  "download": "https://github.com/edgedoggo/FoundryCompanion/releases/download/latest/foundry-companion.zip"
+  "url": "https://github.com/openkyle/FoundryCompanion",
+  "manifest": "https://github.com/openkyle/FoundryCompanion/releases/download/latest/module.json",
+  "download": "https://github.com/openkyle/FoundryCompanion/releases/download/latest/foundry-companion.zip"
 }

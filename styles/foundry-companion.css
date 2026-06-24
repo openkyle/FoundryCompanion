@@ -38,6 +38,10 @@
   width: 100%;
 }
 
+.foundry-companion-options input[type="url"] {
+  width: 100%;
+}
+
 .foundry-companion-options .option-note {
   margin: -2px 0 6px 28px;
   color: var(--color-text-light-6);
