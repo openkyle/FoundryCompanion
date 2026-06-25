@@ -2,7 +2,7 @@
   "id": "foundry-companion",
   "title": "FoundryCompanion",
   "description": "GM-published campaign companion data for a read-only player website.",
-  "version": "0.3.1-rc.16",
+  "version": "0.3.1-rc.17",
   "compatibility": {
     "minimum": "11",
     "verified": "11",
@@ -10,7 +10,8 @@
   },
   "authors": [
     {
-      "name": "Local"
+      "name": "OpenKyle",
+      "url": "https://github.com/openkyle"
     }
   ],
   "relationships": {
